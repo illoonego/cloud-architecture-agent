@@ -62,8 +62,10 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy application source code
 COPY --chown=appuser:appuser src/ ./src/
-COPY --chown=appuser:appuser data/ ./data/
 COPY --chown=appuser:appuser pyproject.toml README.md ./
+
+# Create data directory (users should mount or fetch at runtime)
+RUN mkdir -p data/
 
 # Switch to non-root user
 USER appuser
