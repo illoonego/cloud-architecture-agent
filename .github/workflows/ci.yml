@@ -85,6 +85,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest pytest-cov pytest-asyncio httpx
           pip install fastapi pydantic pydantic-settings python-dotenv openai
+          pip install -e .
 
       - name: Run tests with coverage
         run: |
