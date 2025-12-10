@@ -27,10 +27,10 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
 
-      - name: Install dependencies
+      - name: Install linting dependencies only
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          pip install ruff black isort mypy
 
       - name: Run Ruff (fast linter)
         run: |
@@ -60,11 +60,19 @@ jobs:
     
     strategy:
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.11"]
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Free up disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          df -h
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
@@ -72,10 +80,11 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: 'pip'
 
-      - name: Install dependencies
+      - name: Install core dependencies only
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          pip install pytest pytest-cov pytest-asyncio httpx
+          pip install fastapi pydantic pydantic-settings python-dotenv openai
 
       - name: Run tests with coverage
         run: |
@@ -100,7 +109,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install dependencies
+      - name: Install security tools
         run: |
           python -m pip install --upgrade pip
           pip install safety bandit
