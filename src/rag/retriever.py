@@ -12,6 +12,7 @@ from src.rag.embeddings import get_embedding_service
 
 logger = logging.getLogger(__name__)
 
+
 class ArchitectureRetriever:
     """
     Service responsible for searching the vector database (Qdrant).

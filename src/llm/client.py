@@ -8,6 +8,7 @@ from src.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
+
 class LLMClient:
     """
     A client to talk to a vLLM server (OpenAI-compatible API).
@@ -46,5 +47,6 @@ class LLMClient:
         except Exception as e:
             logger.error(f"Error calling LLM: {type(e).__name__}: {e}")
             import traceback
+
             logger.error(traceback.format_exc())
             return f"Error: Could not connect to the LLM server. {type(e).__name__}: {str(e)}"

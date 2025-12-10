@@ -16,15 +16,15 @@ class TestAgentRouter:
         """Test that AgentRouter can be initialized."""
         router = AgentRouter()
         assert router is not None
-        assert hasattr(router, 'llm')
-        assert hasattr(router, 'query')
+        assert hasattr(router, "llm")
+        assert hasattr(router, "query")
 
     def test_router_with_mock_llm(self, mock_llm_client):
         """Test AgentRouter with a mock LLM client."""
         router = AgentRouter(llm_client=mock_llm_client)
         assert router.llm == mock_llm_client
 
-    @patch('src.agent.router.search_documentation')
+    @patch("src.agent.router.search_documentation")
     def test_query_with_context(self, mock_search, mock_llm_client, sample_query, sample_context):
         """Test query method when RAG returns context."""
         # Setup mocks
@@ -44,7 +44,7 @@ class TestAgentRouter:
         assert "Context:" in call_args
         assert sample_context[0] in call_args
 
-    @patch('src.agent.router.search_documentation')
+    @patch("src.agent.router.search_documentation")
     def test_query_without_context(self, mock_search, mock_llm_client, sample_query):
         """Test query method when RAG returns no context."""
         # Setup mocks
@@ -65,7 +65,7 @@ class TestAgentRouter:
 
     def test_query_prompt_structure(self, mock_llm_client, sample_query):
         """Test that query constructs proper prompt structure."""
-        with patch('src.agent.router.search_documentation', return_value=[]):
+        with patch("src.agent.router.search_documentation", return_value=[]):
             router = AgentRouter(llm_client=mock_llm_client)
             router.query(sample_query)
 

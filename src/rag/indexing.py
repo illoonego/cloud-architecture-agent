@@ -11,6 +11,7 @@ from src.rag.embeddings import get_embedding_service
 
 logger = logging.getLogger(__name__)
 
+
 class Indexer:
     """
     Service responsible for indexing documents into the vector database (Qdrant).

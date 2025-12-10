@@ -12,7 +12,7 @@ from src.agent.tools import search_documentation
 class TestSearchDocumentation:
     """Test suite for search_documentation tool."""
 
-    @patch('src.agent.tools.get_retriever')
+    @patch("src.agent.tools.get_retriever")
     def test_search_documentation_basic(self, mock_get_retriever, sample_query, sample_context):
         """Test basic search_documentation functionality."""
         # Setup mock retriever
@@ -27,7 +27,7 @@ class TestSearchDocumentation:
         assert results == sample_context
         mock_retriever.search.assert_called_once_with(sample_query)
 
-    @patch('src.agent.tools.get_retriever')
+    @patch("src.agent.tools.get_retriever")
     def test_search_documentation_empty_results(self, mock_get_retriever, sample_query):
         """Test search_documentation when no results found."""
         # Setup mock retriever with empty results
@@ -42,7 +42,7 @@ class TestSearchDocumentation:
         assert results == []
         assert isinstance(results, list)
 
-    @patch('src.agent.tools.get_retriever')
+    @patch("src.agent.tools.get_retriever")
     def test_search_documentation_multiple_chunks(self, mock_get_retriever):
         """Test search_documentation with multiple context chunks."""
         # Setup mock with multiple results
@@ -62,7 +62,7 @@ class TestSearchDocumentation:
         assert len(results) == 3
         assert results == expected_results
 
-    @patch('src.agent.tools.get_retriever')
+    @patch("src.agent.tools.get_retriever")
     def test_search_documentation_caches_retriever(self, mock_get_retriever):
         """Test that retriever is reused across calls."""
         # Setup mock
@@ -88,15 +88,17 @@ class TestToolsIntegration:
     def test_tools_module_imports(self):
         """Test that tools module can be imported."""
         from src.agent import tools
-        assert hasattr(tools, 'search_documentation')
+
+        assert hasattr(tools, "search_documentation")
 
     def test_search_documentation_signature(self):
         """Test that search_documentation has correct signature."""
         import inspect
+
         sig = inspect.signature(search_documentation)
 
         # Should accept query parameter
-        assert 'query' in sig.parameters
+        assert "query" in sig.parameters
 
         # Should return list[str]
         assert sig.return_annotation == list[str]
