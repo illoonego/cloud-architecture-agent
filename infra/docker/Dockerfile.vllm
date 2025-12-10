@@ -1,0 +1,73 @@
+# -----------------------------
+# Dockerfile.vllm
+# ⚠️ NOT CURRENTLY USED - Kept for reference only
+# 
+# Current deployment uses official vllm/vllm-openai:v0.6.2 from Docker Hub
+# This custom Dockerfile is only needed if you require:
+#   - Custom vLLM modifications
+#   - Additional system dependencies
+#   - Specific base image requirements
+#
+# See .github/workflows/deploy.yml - uses official image
+# -----------------------------
+
+FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
+
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    VLLM_WORKER_MULTIPROC_METHOD=spawn \
+    CUDA_VISIBLE_DEVICES=0 \
+    MODEL="meta-llama/Llama-3.1-8B-Instruct" \
+    HUGGING_FACE_HUB_TOKEN=""
+
+# Install system dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        python3.10 \
+        python3-pip \
+        curl \
+        ca-certificates \
+        git && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# Symlink python
+RUN ln -sf /usr/bin/python3.10 /usr/bin/python && \
+    ln -sf /usr/bin/pip3 /usr/bin/pip
+
+# Upgrade pip
+RUN pip install --upgrade pip setuptools wheel
+
+# Install vLLM and dependencies in one layer
+# Using vLLM 0.6.3.post1 for better stability
+RUN pip install --no-cache-dir \
+    "numpy<2.0" \
+    "torch==2.4.0" \
+    "vllm==0.6.3.post1"
+
+# Set working directory
+WORKDIR /app
+
+# Create models directory
+RUN mkdir -p /models
+
+# Expose API port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=5 \
+    CMD curl --fail http://localhost:8000/health || exit 1
+
+# Start vLLM OpenAI-compatible API server
+# Using shell form to allow environment variable expansion
+CMD python -m vllm.entrypoints.openai.api_server \
+    --model "$MODEL" \
+    --host 0.0.0.0 \
+    --port 8000 \
+    --dtype half \
+    --max-model-len 4096 \
+    --gpu-memory-utilization 0.90 \
+    --disable-log-requests \
+    --disable-frontend-multiprocessing

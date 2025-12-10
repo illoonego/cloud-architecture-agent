@@ -1,0 +1,163 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cloud-architecture-agent"
+version = "0.1.0"
+description = "A GenAI agent backend for AWS cloud architecture reasoning"
+authors = [
+  { name = "Illias Dadashov" },
+]
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+  "fastapi",
+  "uvicorn",
+  "pydantic",
+  "pydantic-settings",
+  "python-dotenv",
+  "openai",
+  "qdrant-client",
+  "sentence-transformers",
+  "beautifulsoup4",
+  "requests",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/illoonego/cloud-architecture-agent"
+"Documentation" = "https://github.com/illoonego/cloud-architecture-agent/blob/main/docs"
+"Issues" = "https://github.com/illoonego/cloud-architecture-agent/issues"
+
+# ============================================
+# Package discovery
+# ============================================
+[tool.setuptools]
+packages = ["src"]
+
+[tool.setuptools.package-data]
+src = ["py.typed"]
+
+# ============================================
+# Development dependencies
+# ============================================
+[project.optional-dependencies]
+dev = [
+  # Testing
+  "pytest>=7.4.0",
+  "pytest-cov>=4.1.0",
+  "pytest-asyncio>=0.21.0",
+  "httpx>=0.24.0",
+  # Linting and formatting
+  "ruff>=0.1.0",
+  "black>=23.0.0",
+  "isort>=5.12.0",
+  "mypy>=1.5.0",
+  # Security
+  "safety>=2.3.0",
+  "bandit>=1.7.5",
+  # Documentation
+  "mkdocs>=1.5.0",
+  "mkdocs-material>=9.4.0",
+  # Development tools
+  "ipython>=8.15.0",
+  "ipdb>=0.13.13",
+]
+
+# ============================================
+# Ruff configuration
+# ============================================
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+exclude = [
+    ".git",
+    ".venv",
+    "venv",
+    "__pycache__",
+    "build",
+    "dist",
+    "*.egg-info",
+]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "N", "UP", "B", "C4", "SIM"]
+ignore = ["E501", "B008"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
+
+# ============================================
+# Black configuration
+# ============================================
+[tool.black]
+line-length = 100
+target-version = ['py310', 'py311']
+include = '\.pyi?$'
+
+# ============================================
+# isort configuration
+# ============================================
+[tool.isort]
+profile = "black"
+line_length = 100
+multi_line_output = 3
+include_trailing_comma = true
+known_first_party = ["src"]
+
+# ============================================
+# mypy configuration
+# ============================================
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+disallow_untyped_defs = false
+check_untyped_defs = true
+
+# ============================================
+# pytest configuration
+# ============================================
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--verbose",
+    "--cov=src",
+    "--cov-report=term-missing",
+]
+asyncio_mode = "auto"
+
+# ============================================
+# coverage configuration
+# ============================================
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__pycache__/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
+

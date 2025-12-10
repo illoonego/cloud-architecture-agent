@@ -1,0 +1,241 @@
+name: CD - Deploy to AWS
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # Only run on version tags (e.g., v1.0.0)
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  AWS_REGION: us-east-1  # Change to your preferred region
+  ECR_REPOSITORY_API: cloud-architecture-agent-api
+  ECS_CLUSTER: cloud-architecture-cluster
+  ECS_SERVICE_API: cloud-architecture-api-service
+  ECS_TASK_DEFINITION_API: cloud-architecture-api-task
+
+jobs:
+  # ============================================
+  # Job 1: Build and Push Docker Images to ECR
+  # ============================================
+  build-and-push:
+    name: Build & Push to ECR
+    runs-on: ubuntu-latest
+    
+    outputs:
+      api-image: ${{ steps.build-api.outputs.image }}
+      image-tag: ${{ steps.meta.outputs.tags }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Extract metadata (tags, labels)
+        id: meta
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          else
+            TAG="latest"
+          fi
+          echo "tags=$TAG" >> $GITHUB_OUTPUT
+          echo "short-sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "timestamp=$(date +%s)" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Build and Push API Image
+      - name: Build and push API Docker image
+        id: build-api
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./infra/docker/Dockerfile.api
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_API }}:${{ steps.meta.outputs.tags }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_API }}:${{ steps.meta.outputs.short-sha }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_API }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          labels: |
+            org.opencontainers.image.title=Cloud Architecture Agent API
+            org.opencontainers.image.version=${{ steps.meta.outputs.tags }}
+            org.opencontainers.image.created=${{ steps.meta.outputs.timestamp }}
+            org.opencontainers.image.revision=${{ github.sha }}
+
+      - name: Image digest
+        run: |
+          echo "API Image: ${{ steps.build-api.outputs.digest }}"
+          echo "vLLM: Using official vllm/vllm-openai:v0.6.2 from Docker Hub"
+
+  # ============================================
+  # Job 2: Deploy API to ECS Fargate
+  # ============================================
+  deploy-ecs:
+    name: Deploy to ECS Fargate
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
+    
+    environment:
+      name: ${{ github.event.inputs.environment || 'production' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Download task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition ${{ env.ECS_TASK_DEFINITION_API }} \
+            --query taskDefinition > task-definition.json
+
+      - name: Fill in the new image ID in the Amazon ECS task definition
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: api-container
+          image: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_API }}:${{ needs.build-and-push.outputs.image-tag }}
+
+      - name: Deploy Amazon ECS task definition
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE_API }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+
+      - name: Deployment success
+        run: |
+          echo "✅ Deployment completed successfully!"
+          echo "🚀 API service is now running on ECS"
+
+  # ============================================
+  # Job 3: Update EC2 GPU Instance (vLLM)
+  # ============================================
+  deploy-ec2-vllm:
+    name: Deploy vLLM to EC2
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy to EC2 via SSM
+        run: |
+          # Use AWS Systems Manager to run commands on EC2 instance
+          # Uses official vLLM image from Docker Hub (no custom build needed)
+          INSTANCE_ID="${{ secrets.EC2_VLLM_INSTANCE_ID }}"
+          VLLM_IMAGE="vllm/vllm-openai:v0.6.2"
+          
+          aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploy official vLLM Docker image" \
+            --parameters commands=[
+              "docker pull $VLLM_IMAGE",
+              "docker stop vllm-server || true",
+              "docker rm vllm-server || true",
+              "docker run -d --name vllm-server --gpus all -p 8000:8000 -e HUGGING_FACE_HUB_TOKEN='${{ secrets.HUGGING_FACE_TOKEN }}' -v /home/ubuntu/models:/root/.cache/huggingface --restart unless-stopped $VLLM_IMAGE --model meta-llama/Llama-3.1-8B-Instruct --dtype half --max-model-len 4096 --gpu-memory-utilization 0.9"
+            ] \
+            --timeout-seconds 600
+
+      - name: EC2 deployment initiated
+        run: |
+          echo "🖥️  vLLM deployment command sent to EC2 GPU instance"
+          echo "⚡ GPU inference server will restart with new image"
+
+  # ============================================
+  # Job 4: Smoke Tests (Post-Deployment)
+  # ============================================
+  smoke-test:
+    name: Run Smoke Tests
+    runs-on: ubuntu-latest
+    needs: [deploy-ecs]
+    if: success()
+    
+    steps:
+      - name: Wait for deployment stabilization
+        run: sleep 30
+
+      - name: Test API health endpoint
+        run: |
+          # Replace with your actual ECS service URL
+          API_URL="${{ secrets.API_ENDPOINT_URL }}"
+          
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" $API_URL/health)
+          
+          if [ "$RESPONSE" -eq 200 ]; then
+            echo "✅ Health check passed"
+          else
+            echo "❌ Health check failed with status code: $RESPONSE"
+            exit 1
+          fi
+
+      - name: Test query endpoint
+        run: |
+          API_URL="${{ secrets.API_ENDPOINT_URL }}"
+          
+          curl -X POST "$API_URL/query" \
+            -H "Content-Type: application/json" \
+            -d '{"question": "What is AWS Lambda?"}' \
+            | jq .
+
+  # ============================================
+  # Job 5: Notify Deployment Status
+  # ============================================
+  notify:
+    name: Send Notifications
+    runs-on: ubuntu-latest
+    needs: [deploy-ecs, deploy-ec2-vllm, smoke-test]
+    if: always()
+    
+    steps:
+      - name: Deployment Status
+        run: |
+          if [ "${{ needs.smoke-test.result }}" == "success" ]; then
+            echo "✅ Deployment and tests successful"
+            # Add Slack/Discord/Email notification here
+          else
+            echo "❌ Deployment or tests failed"
+            exit 1
+          fi

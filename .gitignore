@@ -1,0 +1,73 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment variables
+.env
+.env.local
+
+# Testing
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Linting/Formatting caches
+.ruff_cache/
+.mypy_cache/
+
+# Qdrant storage
+qdrant_storage/
+
+# Data folder (AWS docs - users fetch their own to avoid copyright issues)
+# Run scripts/fetch_docs.py to populate
+data/
+
+# Personal documentation (not for version control)
+docs/SSH_GUIDE.md
+docs/PYTHON_VLLM_COMMAND_GUIDE.md
+docs/DOCKER_GUIDE.md
+docs/DEPLOYMENT_COMPLETE.md
+docs/code_review.md
+DEPLOYMENT_PLAN.md
+
+# Logs
+*.log
+
+# Jupyter
+.ipynb_checkpoints/
