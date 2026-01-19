@@ -10,7 +10,8 @@ class Settings(BaseSettings):
 
     # --- LLM / vLLM ---
     # vLLM OpenAI-compatible base URL
-    # Override with .env file: VLLM_API_URL=http://YOUR_EC2_IP:8000/v1
+    # Override with .env file: VLLM_API_URL=http://YOUR_ELASTIC_IP:8000/v1
+    # Use Elastic IP for stable address that won't change on EC2 stop/start
     VLLM_API_URL: str = "http://localhost:8000/v1"
     MODEL_NAME: str = "meta-llama/Llama-3.1-8B-Instruct"
 

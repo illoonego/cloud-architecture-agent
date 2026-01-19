@@ -47,11 +47,9 @@ Create a `.env` file:
 
 ```bash
 # LLM Configuration
-# IMPORTANT: Get current EC2 IP (changes on stop/start):
-#   aws ec2 describe-instances --instance-ids <YOUR-INSTANCE-ID> \
-#     --query 'Reservations[0].Instances[0].PublicIpAddress' --output text
-# Or check: AWS Console → EC2 → Instances → Public IPv4 address
-VLLM_API_URL=http://<EC2-PUBLIC-IP>:8000/v1
+# Use Elastic IP (static) - won't change on EC2 stop/start
+# Elastic IP setup: AWS Console → EC2 → Elastic IPs → Allocate → Associate with instance
+VLLM_API_URL=http://<YOUR-ELASTIC-IP>:8000/v1
 MODEL_NAME=meta-llama/Llama-3.1-8B-Instruct
 
 # RAG Configuration
@@ -117,8 +115,8 @@ Visit `http://localhost:8001/docs` for Swagger UI.
 
 **Deploy using official vLLM image:**
 ```bash
-# SSH into EC2 instance
-ssh -i your-key.pem ubuntu@<EC2-PUBLIC-IP>
+# SSH into EC2 instance (use Elastic IP for stable address)
+ssh -i your-key.pem ubuntu@<YOUR-ELASTIC-IP>
 
 # Run vLLM server
 docker run -d --name vllm-server \
@@ -136,7 +134,7 @@ docker run -d --name vllm-server \
 
 **Test deployment:**
 ```bash
-curl http://<EC2-PUBLIC-IP>:8000/health
+curl http://<YOUR-ELASTIC-IP>:8000/health
 ```
 
 ### Cost Management
@@ -145,7 +143,8 @@ curl http://<EC2-PUBLIC-IP>:8000/health
 - g4dn.xlarge costs ~$0.526/hour ($378/month if running 24/7)
 - Stopping the instance stops compute charges
 - Storage charges continue (~$5-10/month)
-- When restarted, public IP changes (update `.env` file)
+- With Elastic IP allocated, the IP stays the same after restart
+- Without Elastic IP, public IP changes on restart (requires `.env` update)
 
 **To stop:** AWS Console → EC2 → Select instance → Instance state → Stop instance
 
@@ -212,11 +211,10 @@ ruff check src/
 
 ### Local Development
 1. Run Qdrant: `docker run -d --name qdrant -p 6333:6333 qdrant/qdrant:latest`
-2. Get current EC2 IP: `./scripts/get_ec2_ip.sh <YOUR-INSTANCE-ID>`
-3. Update `.env` with current EC2 vLLM URL: `VLLM_API_URL=http://<CURRENT-IP>:8000/v1`
-4. Run FastAPI: `python -m uvicorn src.api.main:app --reload --port 8001`
+2. Set Elastic IP in `.env`: `VLLM_API_URL=http://<YOUR-ELASTIC-IP>:8000/v1`
+3. Run FastAPI: `python -m uvicorn src.api.main:app --reload --port 8001`
 
-**Note**: EC2 public IP changes on stop/start. Update `.env` each time you restart the instance. For a stable IP, consider allocating an [AWS Elastic IP](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/elastic-ip-addresses-eip.html) (free while instance is running).
+**Note**: Use an [AWS Elastic IP](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/elastic-ip-addresses-eip.html) for a stable address that won't change on EC2 stop/start (free while instance is running, ~$3.65/month when stopped).
 
 ### Production Deployment
 See [docs/deployment.md](docs/deployment.md) for:
