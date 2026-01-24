@@ -26,6 +26,17 @@ class Settings(BaseSettings):
     # Default number of chunks to retrieve
     RAG_TOP_K: int = 3
 
+    # --- Authentication ---
+    # Comma-separated API keys from .env
+    API_KEYS: str = ""
+
+    @property
+    def api_keys_list(self) -> list[str]:
+        """Parse comma-separated API keys into a list."""
+        if not self.API_KEYS:
+            return []
+        return [key.strip() for key in self.API_KEYS.split(",") if key.strip()]
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
