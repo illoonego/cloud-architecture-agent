@@ -59,16 +59,31 @@ EMBEDDING_MODEL=all-MiniLM-L6-v2
 # API Configuration
 PROJECT_NAME=Cloud Architecture Agent
 API_V1_STR=/api/v1
+
+# Authentication - Generate secure keys with: openssl rand -hex 32
+API_KEYS=your-key-1,your-key-2,your-key-3
 ```
 
-### 3. Build RAG Index
+### 3. Generate API Keys
+
+```bash
+# Generate secure API keys for authentication
+openssl rand -hex 32  # Generate key 1
+openssl rand -hex 32  # Generate key 2
+openssl rand -hex 32  # Generate key 3
+
+# Add the generated keys to your .env file:
+# API_KEYS=e905f3ba...,68e04524...,01b2b87f...
+```
+
+### 4. Build RAG Index
 
 ```bash
 # Index AWS documentation into Qdrant
 python scripts/build_index.py
 ```
 
-### 4. Start Qdrant Vector Database
+### 5. Start Qdrant Vector Database
 
 ```bash
 # Run Qdrant locally in Docker
@@ -77,7 +92,7 @@ docker run -d --name qdrant -p 6333:6333 \
   qdrant/qdrant:latest
 ```
 
-### 5. Run the API
+### 6. Run the API
 
 ```bash
 source .venv/bin/activate
@@ -88,20 +103,44 @@ The API will be available at `http://localhost:8001`.
 
 ## API Endpoints
 
-### Health Check
+### Health Check (No Authentication Required)
 ```bash
 curl http://localhost:8001/health
 ```
 
-### Query the Agent
+### Query the Agent (Requires API Key)
 ```bash
+# Include your API key in the X-API-Key header
 curl -X POST http://localhost:8001/query \
   -H "Content-Type: application/json" \
-  -d '{"query": "How do I set up VPC peering in AWS?"}'
+  -H "X-API-Key: your-api-key-here" \
+  -d '{"question": "How do I set up VPC peering in AWS?"}'
+```
+
+**Response on success:**
+```json
+{
+  "answer": "VPC peering allows you to connect two VPCs...",
+  "sources": ["vpc-peering.md"]
+}
+```
+
+**Response without API key (401):**
+```json
+{
+  "detail": "Not authenticated"
+}
+```
+
+**Response with invalid API key (401):**
+```json
+{
+  "detail": "Invalid or expired API key"
+}
 ```
 
 ### Interactive Documentation
-Visit `http://localhost:8001/docs` for Swagger UI.
+Visit `http://localhost:8001/docs` for Swagger UI. Click the 🔒 icon to enter your API key.
 
 ## vLLM Deployment on AWS EC2
 
