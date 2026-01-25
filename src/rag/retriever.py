@@ -45,7 +45,7 @@ class ArchitectureRetriever:
             hits = results_obj.points
         except Exception as e:
             logger.error(f"Error searching Qdrant: {e}")
-            return []
+            raise
 
         # 3. Extract text from payload
         results: list[str] = []

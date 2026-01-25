@@ -75,7 +75,17 @@ def query_agent(request: Request, query_request: QueryRequest) -> QueryResponse:
             detail=f"LLM service unavailable: {type(e).__name__}"
         )
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error: {type(e).__name__}"
-        )
+        # Check if it's a service error (Qdrant, embeddings, etc.) or a bug
+        error_name = type(e).__name__
+        if "ResponseHandling" in error_name or "Qdrant" in error_name or "Connection" in error_name:
+            # External service failure
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"Search service unavailable: {error_name}"
+            )
+        else:
+            # Actual internal error (bug)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Internal server error: {error_name}"
+            )
