@@ -3,6 +3,7 @@
 import logging
 
 import openai
+from openai import APIConnectionError, APITimeoutError
 
 from src.config.settings import settings
 
@@ -26,6 +27,11 @@ class LLMClient:
     def generate(self, prompt: str) -> str:
         """
         Send a prompt to the LLM and return the text answer.
+
+        Raises:
+            APITimeoutError: If LLM server doesn't respond in time
+            APIConnectionError: If cannot connect to LLM server
+            Exception: For other LLM errors
         """
         try:
             response = self.client.chat.completions.create(
@@ -44,9 +50,14 @@ class LLMClient:
                 max_tokens=512,
             )
             return response.choices[0].message.content
+        except (APITimeoutError, APIConnectionError) as e:
+            logger.error(f"LLM service unavailable: {type(e).__name__}: {e}")
+            # Re-raise to let FastAPI handle with proper status code
+            raise
         except Exception as e:
             logger.error(f"Error calling LLM: {type(e).__name__}: {e}")
             import traceback
 
             logger.error(traceback.format_exc())
-            return f"Error: Could not connect to the LLM server. {type(e).__name__}: {str(e)}"
+            # Re-raise to let FastAPI handle
+            raise

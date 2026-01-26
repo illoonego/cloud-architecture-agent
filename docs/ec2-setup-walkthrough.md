@@ -60,7 +60,11 @@
      - Click **Add security group rule**
      - Type: Custom TCP
      - Port: 8000
-     - Source: **My IP** (for testing) or **Custom** with your API server's IP/VPC CIDR
+     - Source: **My IP** (for initial testing)
+     - ⚠️ **Security Note:** For production, restrict to your API server's IP only:
+       - If API runs locally: Use your home/office IP
+       - If API runs on AWS: Use VPC CIDR or specific EC2 IP
+       - Current setup: Open for testing, EC2 stopped when not in use
   
   3. (Optional) Add Rule - HTTPS:
      - Type: HTTPS
@@ -363,7 +367,85 @@ curl http://54.123.45.67:8000/health
 
 ---
 
-## Part 7: Install AWS CLI and SSM Agent (For CI/CD)
+## Part 7: Security Considerations
+
+### Elastic IP Setup (Recommended)
+
+**Why use Elastic IP?**
+- Fixed IP address doesn't change when you stop/start EC2
+- No need to update `.env` file every time
+- Professional setup for portfolio projects
+
+**Allocate Elastic IP:**
+```bash
+# Via AWS Console:
+# EC2 → Network & Security → Elastic IPs → Allocate Elastic IP address
+
+# Via AWS CLI:
+aws ec2 allocate-address --domain vpc
+```
+
+**Associate with EC2:**
+```bash
+# EC2 → Actions → Networking → Associate Elastic IP address
+# Or via CLI:
+aws ec2 associate-address \
+  --instance-id i-YOUR-INSTANCE-ID \
+  --allocation-id eipalloc-YOUR-ALLOCATION-ID
+```
+
+**Current Setup:** ✅ Elastic IP `54.86.51.139` already configured
+9
+### Security Group Best Practices
+
+**Current Configuration:**
+- Port 22 (SSH): Restricted to your IP
+- Port 8000 (vLLM): Open for testing
+
+**For Production (24/7 running):**
+
+```bash
+# Remove open access to port 8000
+aws ec2 revoke-security-group-ingress \
+  --group-id sg-YOUR-SG-ID \
+  --protocol tcp \
+  --port 8000 \
+  --cidr 0.0.0.0/0
+
+# Add specific IP only (your API server)
+aws ec2 authorize-security-group-ingress \
+  --group-id sg-YOUR-SG-ID \
+  --protocol tcp \
+  --port 8000 \
+  --cidr YOUR_API_IP/32
+```
+
+**Note:** Since this is a portfolio project with EC2 stopped most of the time, current security group is adequate. Implement tighter restrictions if running 24/7.
+
+### API Authentication
+
+The FastAPI application uses **API key authentication** to secure endpoints:
+
+**Implementation:**
+- Header-based: `X-API-Key: your-key-here`
+- Keys stored in `.env` file (gitignored)
+- Returns 401 for invalid/missing keys
+
+**Generate Keys:**
+```bash
+openssl rand -hex 32
+```
+
+**Why this matters:**
+- vLLM server on EC2 has no built-in authentication
+- API layer provides the security (API keys + rate limiting)
+- Only authenticated requests reach vLLM
+
+**Current Setup:** ✅ 3 API keys configured, 5 req/min rate limit
+
+---
+
+## Part 8: Install AWS CLI and SSM Agent (For CI/CD)
 
 ### Install AWS CLI
 ```bash

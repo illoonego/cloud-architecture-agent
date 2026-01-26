@@ -1,41 +1,257 @@
 # Deployment Guide
 
-This guide covers deploying the Cloud Architecture Agent to AWS using the automated CI/CD pipeline.
+This guide covers deploying the Cloud Architecture Agent to AWS.
 
 ## Table of Contents
-1. [Prerequisites](#prerequisites)
-2. [AWS Infrastructure Setup](#aws-infrastructure-setup)
-3. [GitHub Secrets Configuration](#github-secrets-configuration)
-4. [Deployment Workflow](#deployment-workflow)
-5. [Manual Deployment Steps](#manual-deployment-steps)
-6. [Troubleshooting](#troubleshooting)
+1. [Current Production Architecture](#current-production-architecture)
+2. [Prerequisites](#prerequisites)
+3. [Local Development Setup](#local-development-setup)
+4. [AWS EC2 vLLM Setup](#aws-ec2-vllm-setup)
+5. [Security Configuration](#security-configuration)
+6. [Future: ECS/Fargate Deployment](#future-ecsfargate-deployment)
+7. [Troubleshooting](#troubleshooting)
+
+---
+
+## Current Production Architecture
+
+**Actual Deployed Setup:**
+
+```
+┌──────────────────┐
+│  Local Machine   │
+│                  │
+│  ┌────────────┐  │
+│  │  FastAPI   │  │  ← Runs locally with uvicorn
+│  │  API       │  │  ← Port 8001
+│  │            │  │  ← API keys + rate limiting
+│  └─────┬──────┘  │
+│        │         │
+└────────┼─────────┘
+         │
+         │ HTTP requests to vLLM
+         │
+         ▼
+┌──────────────────────────┐
+│   AWS EC2 (g4dn.xlarge)  │
+│   54.86.51.139 (Elastic) │
+│                          │
+│   ┌────────────────┐     │
+│   │  vLLM Server   │     │
+│   │  (Docker)      │     │
+│   │  Port 8000     │     │
+│   │  Llama-3.1-8B  │     │
+│   └────────────────┘     │
+└──────────────────────────┘
+```
+
+**Why This Architecture:**
+- API runs locally: Easy development, no ECS costs
+- vLLM on EC2: GPU required, stopped when not in use (~$0.526/hour)
+- Elastic IP: Fixed IP address (54.86.51.139) for consistent access
+- Portfolio project: Cost-optimized, EC2 stopped most of the time
+
+**Cost:** ~$12/day when running, $0 when stopped
 
 ---
 
 ## Prerequisites
 
 ### Required Tools
+- Python 3.10+
+- Docker Desktop (for EC2 vLLM)
 - AWS CLI v2
-- Docker Desktop
 - Git
-- GitHub account with Actions enabled
 
-### AWS Resources Needed
-- ECR repositories (2): API and vLLM images
+### AWS Resources (Current Setup)
+- ✅ EC2 GPU instance: g4dn.xlarge with T4 GPU
+- ✅ Elastic IP: 54.86.51.139
+- ✅ Security Group: Allows port 22 (SSH) and 8000 (vLLM)
+- ✅ IAM Role: EC2 with SSM and ECR read permissions
+
+### AWS Resources (Future ECS Deployment)
+- ECR repositories for API and vLLM images
 - ECS Cluster with Fargate
-- EC2 GPU instance (g4dn.xlarge or g5.xlarge) for vLLM
 - VPC with public/private subnets
-- Application Load Balancer (optional)
-- IAM roles and policies
-
-### AWS Account Quotas
-- GPU instance quota (g5.xlarge) - request increase if needed
-- ECR storage limit
-- ECS service limits
+- Application Load Balancer
+- Additional IAM roles and policies
 
 ---
 
-## AWS Infrastructure Setup
+## Local Development Setup
+
+### Step 1: Clone Repository
+
+```bash
+git clone https://github.com/YOUR_USERNAME/cloud-architecture-agent.git
+cd cloud-architecture-agent
+```
+
+### Step 2: Create Environment File
+
+Create `.env` file:
+
+```bash
+# LLM Configuration
+VLLM_API_URL=http://54.86.51.139:8000/v1  # Elastic IP
+VLLM_MODEL_NAME=meta-llama/Llama-3.1-8B-Instruct
+
+# RAG Configuration
+QDRANT_URL=:memory:  # In-memory mode
+EMBEDDING_MODEL=all-MiniLM-L6-v2
+QUERY_TOP_K=5
+
+# Security
+API_KEYS=key1,key2,key3  # Generate with: openssl rand -hex 32
+
+# Server
+HOST=0.0.0.0
+PORT=8001
+```
+
+### Step 3: Install Dependencies
+
+```bash
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install packages
+pip install -e .
+```
+
+### Step 4: Build Qdrant Index
+
+```bash
+python scripts/build_index.py
+```
+
+### Step 5: Run API Server
+
+```bash
+uvicorn src.api.main:app --host 0.0.0.0 --port 8001 --reload
+```
+
+**Test:**
+```bash
+# Health check
+curl http://localhost:8001/health
+
+# Test query (replace with your API key)
+curl -X POST http://localhost:8001/query \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -d '{"question": "What is AWS Lambda?"}'
+```
+
+---
+
+## AWS EC2 vLLM Setup
+
+See [ec2-setup-walkthrough.md](ec2-setup-walkthrough.md) for complete EC2 GPU instance setup.
+
+**Quick Reference:**
+
+```bash
+# SSH to EC2
+ssh -i ~/.ssh/aws-keys/vllm-key.pem ubuntu@54.86.51.139
+
+# Check vLLM status
+docker ps
+docker logs -f vllm-server
+
+# Restart vLLM
+docker restart vllm-server
+```
+
+**Start/Stop EC2 (Cost Management):**
+
+```bash
+# Stop when not needed
+aws ec2 stop-instances --instance-ids i-YOUR-INSTANCE-ID
+
+# Start when needed
+aws ec2 start-instances --instance-ids i-YOUR-INSTANCE-ID
+
+# Get status
+aws ec2 describe-instances --instance-ids i-YOUR-INSTANCE-ID \
+  --query 'Reservations[0].Instances[0].State.Name'
+```
+
+---
+
+## Security Configuration
+
+### API Key Management
+
+**Generate API Keys:**
+```bash
+# Generate 3 secure keys
+openssl rand -hex 32
+openssl rand -hex 32
+openssl rand -hex 32
+```
+
+**Store in `.env`:**
+```bash
+API_KEYS=key1,key2,key3
+```
+
+**⚠️ Security Notes:**
+- Never commit `.env` to Git (already in `.gitignore`)
+- Share keys securely (1Password, encrypted channels)
+- Rotate keys periodically
+- For production: Use AWS Secrets Manager
+
+### Rate Limiting
+
+**Current Configuration:**
+- 5 requests per minute per IP address
+- Implemented with slowapi
+- Returns 429 when exceeded
+
+**Code Location:** `src/api/main.py`
+
+```python
+from slowapi import Limiter
+
+limiter = Limiter(key_func=get_remote_address)
+
+@limiter.limit("5/minute")
+@app.post("/query")
+async def query_endpoint(...):
+    # Rate limited endpoint
+```
+
+### EC2 Security Group
+
+**Current Rules:**
+- Port 22 (SSH): Your IP only
+- Port 8000 (vLLM): Your IP only (for testing)
+
+**For Production:**
+```bash
+# Add your API server's IP to security group
+aws ec2 authorize-security-group-ingress \
+  --group-id sg-YOUR-SG-ID \
+  --protocol tcp \
+  --port 8000 \
+  --cidr YOUR_API_SERVER_IP/32
+```
+
+**Note:** Current setup doesn't restrict port 8000 since EC2 is stopped most of the time. For 24/7 production, restrict to API server IP only.
+
+### Elastic IP Benefits
+
+✅ **Fixed address**: 54.86.51.139 doesn't change when EC2 stops/starts  
+✅ **No .env updates**: API always connects to same IP  
+✅ **Cost**: Free when attached to running instance, $0.005/hour when detached  
+
+---
+
+## Future: ECS/Fargate Deployment
+
+**Note:** This section describes a future production architecture. Current setup runs API locally.
 
 ### Step 1: Create ECR Repositories
 
@@ -312,9 +528,21 @@ aws ecs update-service \
 
 ## Next Steps
 
-- [ ] Set up CloudWatch alarms for critical metrics
-- [ ] Configure Auto Scaling policies
-- [ ] Add authentication (API keys, OAuth)
-- [ ] Implement request rate limiting
-- [ ] Set up Qdrant server mode (persistent storage)
-- [ ] Add Terraform/CDK for infrastructure as code
+### Completed ✅
+- [x] API key authentication (3 keys generated)
+- [x] Rate limiting (5 req/min per IP)
+- [x] Elastic IP for vLLM (54.86.51.139)
+- [x] EC2 GPU instance with Docker vLLM
+- [x] Local API development setup
+- [x] Proper HTTP error codes (401, 422, 429, 503, 500)
+
+### Future Enhancements 🔄
+- [ ] Move API to ECS Fargate (containerized deployment)
+- [ ] AWS Secrets Manager for API keys
+- [ ] CloudWatch alarms for GPU/API metrics
+- [ ] Qdrant server mode (persistent storage)
+- [ ] HTTPS with SSL certificates
+- [ ] CI/CD pipeline (GitHub Actions)
+- [ ] Terraform/CDK for infrastructure as code
+- [ ] Per-key rate limiting
+- [ ] API key rotation automation

@@ -2,249 +2,265 @@
 
 A production-grade GenAI agent backend for AWS cloud architecture reasoning, built with Python, FastAPI, and vLLM.
 
-> **Note on AWS Documentation**: This project fetches AWS documentation from [docs.aws.amazon.com](https://docs.aws.amazon.com/) which is licensed under [CC-BY-SA-4.0](https://creativecommons.org/licenses/by-sa/4.0/). Documentation is not included in this repository; users must fetch it themselves using the provided script for educational and research purposes.
+[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green.svg)](https://fastapi.tiangolo.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## Features
+> **Note on AWS Documentation**: This project uses AWS documentation from [docs.aws.amazon.com](https://docs.aws.amazon.com/) (licensed under [CC-BY-SA-4.0](https://creativecommons.org/licenses/by-sa/4.0/)). The docs aren't included in this repo—you'll need to fetch them using the provided script.
 
-- **RAG-powered**: Retrieval-Augmented Generation using Qdrant vector database
-- **Self-hosted LLM**: Uses vLLM for high-performance model serving
-- **Modular architecture**: Clean separation of concerns (API, Agent, RAG, LLM)
-- **Containerized**: Docker-ready for easy deployment
-- **Production-ready**: Designed for AWS deployment with CI/CD
+---
 
-## Architecture
+## What's This About?
+
+This is a backend API that uses RAG (Retrieval-Augmented Generation) to answer questions about AWS cloud architecture. Instead of relying on external APIs like OpenAI, it runs a self-hosted LLM (Llama 3.1) on AWS EC2 and searches through AWS documentation to provide accurate, sourced answers.
+
+**Tech stack:** Python, FastAPI, vLLM, Qdrant, Docker, AWS EC2
+
+---
+
+## 🏗️ Architecture
 
 ```
-User → FastAPI → AgentRouter → {RAG + LLM} → Response
+┌─────────────┐
+│   Client    │
+└──────┬──────┘
+       │ HTTP Request
+       ↓
+┌──────────────────────────────────────┐
+│  FastAPI Application (Port 8001)     │
+│  ├─ API Key Authentication           │
+│  ├─ Rate Limiting (5 req/min)        │
+│  └─ HTTP Error Handling (401/429/503)│
+└──────┬──────────────────┬────────────┘
+       │                  │
+       │ Search           │ Generate
+       ↓                  ↓
+┌──────────────┐   ┌─────────────────┐
+│   Qdrant     │   │  vLLM (EC2 GPU) │
+│  Vector DB   │   │  Llama-3.1-8B   │
+│  (RAG)       │   │  Port 8000      │
+└──────────────┘   └─────────────────┘
 ```
 
-See [docs/architecture.md](docs/architecture.md) for detailed architecture diagrams.
+When you ask a question:
+1. The API validates your API key and checks rate limits
+2. Your question gets embedded and used to search AWS docs in Qdrant
+3. Relevant docs are sent to the LLM (running on EC2) as context
+4. The LLM generates an answer based on that context
+5. You get a JSON response with the answer and source documents
 
-## Prerequisites
+For the full architectural breakdown, see [docs/architecture.md](docs/architecture.md).
 
+---
+
+## 🚀 Demo
+
+### 📸 Screenshots
+
+**Swagger UI with Authentication:**
+
+![Swagger UI](docs/images/swagger-ui.png)
+
+*Interactive API documentation with 🔒 authentication locks on protected endpoints*
+
+**Example Query:**
+```bash
+curl -X POST http://localhost:8001/query \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-key" \
+  -d '{"question": "How do I set up VPC peering?"}'
+```
+
+**Response:**
+```json
+{
+  "question": "How do I set up VPC peering?",
+  "answer": "VPC peering allows you to connect two VPCs privately...",
+  "sources": ["vpc-peering.md"]
+}
+```
+
+> **Note:** The GPU instance is stopped most of the time to save costs (~$12/day). I can spin it up for a live demo with 30 minutes notice.
+
+---
+
+## Key Features
+
+- **API Security**: API key authentication and rate limiting (5 req/min per IP)
+- **Error Handling**: Proper HTTP status codes (401, 429, 503, 500) with clear messages
+- **RAG Implementation**: Vector search with Qdrant for document retrieval
+- **Self-hosted LLM**: vLLM running Llama 3.1 on AWS EC2 GPU
+- **Clean Code**: Type hints, error propagation, structured logging
+
+---
+
+## Why These Choices?
+
+**vLLM over OpenAI API:**
+- Full control over the model and data
+- No per-token costs (just EC2 compute at ~$0.53/hour)
+- Lower latency—no external API calls
+- Good practice for real-world ML deployment
+
+**RAG over Fine-tuning:**
+- Can update documentation without retraining
+- Shows exactly which docs were used (transparency)
+- Much cheaper—no training compute needed
+- Easier to maintain
+
+**FastAPI + Qdrant + Docker:**
+- FastAPI gives you async support and auto-generated docs
+- Qdrant is fast and easy to run locally
+- Docker keeps everything reproducible
+
+---
+
+## 📦 Quick Start
+
+### Prerequisites
 - Python 3.10+
-- Docker (optional, for containerization)
-- AWS EC2 GPU instance (for vLLM deployment)
+- Docker (for Qdrant)
+- AWS account (for EC2 GPU deployment)
 
-## Quick Start
-
-### 1. Clone and Setup
+### 1. Local Development Setup
 
 ```bash
+# Clone and install
 git clone https://github.com/illoonego/cloud-architecture-agent.git
 cd cloud-architecture-agent
 python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+source .venv/bin/activate
 pip install -e .
+```
 
-# Fetch AWS documentation for RAG
+### 2. Get the AWS documentation
+
+```bash
 python scripts/fetch_docs.py
 ```
 
-### 2. Configure Environment
-
-Create a `.env` file:
+### 3. Start Qdrant and build the index
 
 ```bash
-# LLM Configuration
-# IMPORTANT: Get current EC2 IP (changes on stop/start):
-#   aws ec2 describe-instances --instance-ids <YOUR-INSTANCE-ID> \
-#     --query 'Reservations[0].Instances[0].PublicIpAddress' --output text
-# Or check: AWS Console → EC2 → Instances → Public IPv4 address
-VLLM_API_URL=http://<EC2-PUBLIC-IP>:8000/v1
-MODEL_NAME=meta-llama/Llama-3.1-8B-Instruct
-
-# RAG Configuration
-QDRANT_URL=http://localhost:6333  # For local Qdrant in Docker
-EMBEDDING_MODEL=all-MiniLM-L6-v2
-
-# API Configuration
-PROJECT_NAME=Cloud Architecture Agent
-API_V1_STR=/api/v1
-```
-
-### 3. Build RAG Index
-
-```bash
-# Index AWS documentation into Qdrant
-python scripts/build_index.py
-```
-
-### 4. Start Qdrant Vector Database
-
-```bash
-# Run Qdrant locally in Docker
 docker run -d --name qdrant -p 6333:6333 \
   -v $(pwd)/qdrant_storage:/qdrant/storage \
   qdrant/qdrant:latest
+
+python scripts/build_index.py
+```
+
+### 4. Configure your environment
+
+```bash
+# Generate an API key
+openssl rand -hex 32
+
+# Create .env file (see .env.example)
+# Set VLLM_API_URL and add your API_KEYS
 ```
 
 ### 5. Run the API
 
 ```bash
-source .venv/bin/activate
-python -m uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8001
+python -m uvicorn src.api.main:app --reload --port 8001
 ```
 
-The API will be available at `http://localhost:8001`.
-
-## API Endpoints
-
-### Health Check
+Test it:
 ```bash
+# Health check (no auth required)
 curl http://localhost:8001/health
-```
 
-### Query the Agent
-```bash
+# Query with API key
 curl -X POST http://localhost:8001/query \
   -H "Content-Type: application/json" \
-  -d '{"query": "How do I set up VPC peering in AWS?"}'
+  -H "X-API-Key: your-generated-key" \
+  -d '{"question": "What is a VPC?"}'
+
+# Interactive docs
+open http://localhost:8001/docs
 ```
 
-### Interactive Documentation
-Visit `http://localhost:8001/docs` for Swagger UI.
+---
 
-## vLLM Deployment on AWS EC2
+## 🌩️ AWS Deployment
 
-### Deploy vLLM on EC2 GPU Instance
+### EC2 GPU Setup (vLLM)
 
-**Prerequisites:**
-- AWS EC2 g4dn.xlarge or g5.xlarge instance (with GPU)
-- Ubuntu 24.04 Deep Learning AMI
-- Docker with NVIDIA Container Toolkit installed
-- HuggingFace token for Llama model access
-
-**Deploy using official vLLM image:**
 ```bash
-# SSH into EC2 instance
-ssh -i your-key.pem ubuntu@<EC2-PUBLIC-IP>
+# 1. Launch g4dn.xlarge instance (Ubuntu 24.04 Deep Learning AMI)
+# 2. Allocate Elastic IP and associate with instance
+# 3. SSH into instance
+ssh -i your-key.pem ubuntu@YOUR-ELASTIC-IP
 
-# Run vLLM server
+# 4. Deploy vLLM
 docker run -d --name vllm-server \
   --gpus all \
   -p 8000:8000 \
-  -e HUGGING_FACE_HUB_TOKEN='your-hf-token' \
-  -v /home/ubuntu/models:/root/.cache/huggingface \
-  --restart unless-stopped \
+  -e HUGGING_FACE_HUB_TOKEN='your-token' \
   vllm/vllm-openai:v0.6.2 \
   --model meta-llama/Llama-3.1-8B-Instruct \
   --dtype half \
-  --max-model-len 4096 \
-  --gpu-memory-utilization 0.9
+  --max-model-len 4096
 ```
 
-**Test deployment:**
-```bash
-curl http://<EC2-PUBLIC-IP>:8000/health
-```
+**Cost note:** The g4dn.xlarge costs ~$0.53/hour ($12.72/day). I stop the instance when not using it (storage is only ~$5-10/month).
 
-### Cost Management
+For detailed EC2 setup with GPU, security groups, and Elastic IP configuration, see [docs/ec2-setup-walkthrough.md](docs/ec2-setup-walkthrough.md).
 
-**Stop EC2 when not in use to save money:**
-- g4dn.xlarge costs ~$0.526/hour ($378/month if running 24/7)
-- Stopping the instance stops compute charges
-- Storage charges continue (~$5-10/month)
-- When restarted, public IP changes (update `.env` file)
-
-**To stop:** AWS Console → EC2 → Select instance → Instance state → Stop instance
-
-### Production Deployment
-
-See [docs/ec2-setup-walkthrough.md](docs/ec2-setup-walkthrough.md) for complete step-by-step guide including:
-- EC2 instance launch and configuration
-- Docker and GPU setup
-- Security group configuration
-- vLLM deployment and monitoring
+---
 
 ## Project Structure
 
 ```
-├── .github/
-│   └── workflows/    # CI/CD pipelines (GitHub Actions)
-├── data/             # AWS docs (gitignored - run scripts/fetch_docs.py)
-├── docs/             # Project documentation
-│   ├── api.md        # API reference
-│   ├── architecture.md  # System architecture
-│   ├── deployment.md    # Deployment guide
-│   └── ec2-setup-walkthrough.md  # EC2 setup tutorial
-├── infra/
-│   ├── docker/       # Dockerfiles (API & vLLM)
-│   └── aws/          # AWS infrastructure docs
-├── scripts/          # Utility scripts
-│   ├── build_index.py    # Build RAG index
-│   ├── fetch_docs.py     # Fetch AWS docs
-│   ├── run_eval.py       # Run evaluations
-│   └── deploy_vllm.sh    # Deploy vLLM to EC2
+cloud-architecture-agent/
 ├── src/
-│   ├── api/          # FastAPI application
-│   ├── agent/        # Agent orchestration (router + tools)
-│   ├── llm/          # LLM client (vLLM integration)
-│   ├── rag/          # RAG components (embeddings, indexing, retrieval)
-│   ├── config/       # Configuration management
-│   └── monitoring/   # Logging and metrics
-├── tests/            # Unit and integration tests
-├── .env.example      # Environment variables template
-├── pyproject.toml    # Project dependencies and config
-└── README.md         # This file
+│   ├── api/           # FastAPI application + auth
+│   ├── agent/         # Agent orchestration logic
+│   ├── llm/           # vLLM client
+│   ├── rag/           # Vector search (embeddings, indexing, retrieval)
+│   └── config/        # Settings management
+├── tests/             # Unit and integration tests
+├── scripts/           # Utility scripts (fetch docs, build index)
+├── docs/              # Additional documentation
+│   ├── architecture.md       # Detailed system design
+│   ├── ec2-setup-walkthrough.md  # Step-by-step EC2 guide
+│   └── deployment.md         # Production deployment guide
+├── infra/docker/      # Dockerfiles
+├── .env.example       # Environment template
+└── pyproject.toml     # Dependencies
 ```
 
-## Development
+---
 
-### Install Development Dependencies
-```bash
-# Install with dev tools (testing, linting, etc.)
-pip install -e ".[dev]"
-```
+## Testing
 
-### Running Tests
 ```bash
+# Run tests
 pytest tests/
+
+# Test with coverage
+pytest --cov=src tests/
+
+# Specific test file
+pytest tests/test_agent.py -v
 ```
 
-### Code Quality
-```bash
-black src/
-ruff check src/
-```
+**Test Coverage:**
+- Unit tests for RAG retrieval
+- Integration tests for agent pipeline
+- API endpoint tests with auth
 
-## Deployment
+---
 
-### Local Development
-1. Run Qdrant: `docker run -d --name qdrant -p 6333:6333 qdrant/qdrant:latest`
-2. Get current EC2 IP: `./scripts/get_ec2_ip.sh <YOUR-INSTANCE-ID>`
-3. Update `.env` with current EC2 vLLM URL: `VLLM_API_URL=http://<CURRENT-IP>:8000/v1`
-4. Run FastAPI: `python -m uvicorn src.api.main:app --reload --port 8001`
+## Documentation
 
-**Note**: EC2 public IP changes on stop/start. Update `.env` each time you restart the instance. For a stable IP, consider allocating an [AWS Elastic IP](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/elastic-ip-addresses-eip.html) (free while instance is running).
+- [docs/architecture.md](docs/architecture.md) - System design and architecture decisions
+- [docs/api.md](docs/api.md) - Complete API reference with all endpoints and error codes
+- [docs/deployment.md](docs/deployment.md) - Production deployment guide
+- [docs/ec2-setup-walkthrough.md](docs/ec2-setup-walkthrough.md) - Step-by-step EC2 GPU setup
 
-### Production Deployment
-See [docs/deployment.md](docs/deployment.md) for:
-- CI/CD with GitHub Actions
-- AWS ECS deployment (FastAPI)
-- AWS EC2 GPU deployment (vLLM)
-- Infrastructure as code setup
-
-## Scripts
-
-- **`scripts/fetch_docs.py`** - Web scraper to fetch AWS documentation from official AWS docs
-- **`scripts/build_index.py`** - Build RAG vector index from fetched docs
-- **`scripts/get_ec2_ip.sh`** - Helper to get current EC2 public IP (changes on restart)
-- **`scripts/run_eval.py`** - Run agent evaluations
-- **`scripts/deploy_vllm.sh`** - Deploy vLLM to EC2
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Install dev dependencies: `pip install -e ".[dev]"`
-4. Make your changes
-5. Run tests: `pytest tests/`
-6. Run linting: `black src/ && ruff check src/`
-7. Commit changes: `git commit -m 'Add amazing feature'`
-8. Push to branch: `git push origin feature/amazing-feature`
-9. Open a Pull Request
+---
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) file for details
+MIT License - See [LICENSE](LICENSE)

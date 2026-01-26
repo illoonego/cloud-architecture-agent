@@ -10,7 +10,8 @@ class Settings(BaseSettings):
 
     # --- LLM / vLLM ---
     # vLLM OpenAI-compatible base URL
-    # Override with .env file: VLLM_API_URL=http://YOUR_EC2_IP:8000/v1
+    # Override with .env file: VLLM_API_URL=http://YOUR_ELASTIC_IP:8000/v1
+    # Use Elastic IP for stable address that won't change on EC2 stop/start
     VLLM_API_URL: str = "http://localhost:8000/v1"
     MODEL_NAME: str = "meta-llama/Llama-3.1-8B-Instruct"
 
@@ -24,6 +25,17 @@ class Settings(BaseSettings):
 
     # Default number of chunks to retrieve
     RAG_TOP_K: int = 3
+
+    # --- Authentication ---
+    # Comma-separated API keys from .env
+    API_KEYS: str = ""
+
+    @property
+    def api_keys_list(self) -> list[str]:
+        """Parse comma-separated API keys into a list."""
+        if not self.API_KEYS:
+            return []
+        return [key.strip() for key in self.API_KEYS.split(",") if key.strip()]
 
     class Config:
         env_file = ".env"

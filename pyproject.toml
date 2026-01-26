@@ -27,6 +27,7 @@ dependencies = [
   "sentence-transformers",
   "beautifulsoup4",
   "requests",
+  "slowapi"
 ]
 
 [project.urls]
