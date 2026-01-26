@@ -130,3 +130,101 @@ sequenceDiagram
 - **Containerization**: Docker
 - **Deployment**: AWS ECS/EC2
 - **CI/CD**: GitHub Actions (planned)
+---
+
+## Security Architecture
+
+### Authentication Flow
+
+```text
+┌────────────┐
+│   Client   │
+└─────┬──────┘
+      │ POST /query
+      │ X-API-Key: abc123...
+      ▼
+┌─────────────────────────┐
+│  API Key Validation     │
+│  (src/api/auth.py)      │
+└─────┬──────────┬────────┘
+      │          │
+   Valid?     Invalid?
+      │          │
+      ▼          ▼
+┌──────────┐  ┌──────────┐
+│ Process  │  │ Return   │
+│ Request  │  │ 401      │
+└──────────┘  └──────────┘
+```
+
+### Security Layers
+
+#### Layer 1: API Key Authentication
+- **Implementation**: FastAPI Security dependency (`verify_api_key`)
+- **Storage**: `.env` file (comma-separated keys)
+- **Validation**: Header-based (`X-API-Key`)
+- **Error Handling**: Returns 401 with clear error messages
+
+**Code Location**: `src/api/auth.py`
+
+```python
+@app.post("/query", dependencies=[Depends(verify_api_key)])
+async def query_endpoint(...):
+    # Only reachable with valid API key
+```
+
+#### Layer 2: Rate Limiting
+- **Implementation**: slowapi (Flask-Limiter for FastAPI)
+- **Strategy**: IP-based limiting
+- **Limits**: 5 requests per minute per IP
+- **Error Handling**: Returns 429 with retry guidance
+
+**Code Location**: `src/api/main.py`
+
+```python
+@limiter.limit("5/minute")
+@app.post("/query", ...)
+async def query_endpoint(...):
+    # Rate limited to 5 req/min
+```
+
+#### Layer 3: Input Validation
+- **Implementation**: Pydantic models
+- **Validation**: Type checking, required fields
+- **Error Handling**: Returns 422 with validation details
+
+**Code Location**: Request/Response models in `src/api/main.py`
+
+#### Layer 4: Error Handling
+- **Implementation**: Exception propagation with HTTP status mapping
+- **Strategy**: Service errors (503) vs. bugs (500)
+- **Logging**: Structured logging for debugging
+
+**Error Code Mapping**:
+- `401` → Authentication failures
+- `422` → Validation errors
+- `429` → Rate limit exceeded
+- `503` → External service failures (LLM, Qdrant)
+- `500` → Internal errors (bugs)
+
+**Code Location**: Exception handlers in `src/api/main.py`
+
+### Security Best Practices Implemented
+
+✅ **Secrets Management**: API keys in `.env` (gitignored)  
+✅ **Least Privilege**: Only `/query` requires authentication  
+✅ **Rate Limiting**: Prevents abuse and DoS attacks  
+✅ **Error Messages**: Clear but not leaking sensitive info  
+✅ **Input Validation**: Pydantic prevents injection attacks  
+✅ **Logging**: Errors logged for debugging, not exposed to clients  
+
+### Future Security Enhancements
+
+🔄 **AWS Secrets Manager**: Move API keys from `.env` to AWS Secrets Manager  
+🔄 **Security Groups**: Restrict vLLM port 8000 to API server only  
+🔄 **TLS/HTTPS**: Enable HTTPS with SSL certificates  
+🔄 **Per-Key Rate Limits**: Different limits for different API keys  
+🔄 **API Key Rotation**: Automated key expiration and rotation  
+🔄 **Audit Logging**: Track all API access for compliance  
+
+---
