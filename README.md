@@ -1,23 +1,20 @@
-# AWS Cloud Architecture Agent 🤖☁️
+# AWS Cloud Architecture Agent
 
-> A production-grade GenAI agent for AWS cloud architecture questions, demonstrating RAG, LLM deployment, API security, and cloud infrastructure skills.
+A production-grade GenAI agent backend for AWS cloud architecture reasoning, built with Python, FastAPI, and vLLM.
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green.svg)](https://fastapi.tiangolo.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+> **Note on AWS Documentation**: This project uses AWS documentation from [docs.aws.amazon.com](https://docs.aws.amazon.com/) (licensed under [CC-BY-SA-4.0](https://creativecommons.org/licenses/by-sa/4.0/)). The docs aren't included in this repo—you'll need to fetch them using the provided script.
+
 ---
 
-## 🎯 Project Highlights
+## What's This About?
 
-**What This Demonstrates:**
-- ✅ **Production API Development**: FastAPI with authentication, rate limiting, and proper error handling
-- ✅ **RAG Implementation**: Vector search with Qdrant and sentence transformers
-- ✅ **LLM Deployment**: Self-hosted vLLM on AWS EC2 GPU instance
-- ✅ **Cloud Infrastructure**: AWS EC2, Elastic IPs, security best practices
-- ✅ **Software Engineering**: Clean architecture, type hints, error handling, testing
+This is a backend API that uses RAG (Retrieval-Augmented Generation) to answer questions about AWS cloud architecture. Instead of relying on external APIs like OpenAI, it runs a self-hosted LLM (Llama 3.1) on AWS EC2 and searches through AWS documentation to provide accurate, sourced answers.
 
-**Tech Stack:** Python, FastAPI, vLLM, Qdrant, Docker, AWS EC2, Llama 3.1
+**Tech stack:** Python, FastAPI, vLLM, Qdrant, Docker, AWS EC2
 
 ---
 
@@ -45,27 +42,18 @@
 └──────────────┘   └─────────────────┘
 ```
 
-**Data Flow:**
-1. **User Query** → API validates auth & rate limits
-2. **RAG Search** → Find relevant AWS docs in Qdrant
-3. **LLM Generation** → vLLM generates answer with context
-4. **Response** → Structured JSON with answer + sources
+When you ask a question:
+1. The API validates your API key and checks rate limits
+2. Your question gets embedded and used to search AWS docs in Qdrant
+3. Relevant docs are sent to the LLM (running on EC2) as context
+4. The LLM generates an answer based on that context
+5. You get a JSON response with the answer and source documents
 
-See [docs/architecture.md](docs/architecture.md) for detailed design decisions.
+For the full architectural breakdown, see [docs/architecture.md](docs/architecture.md).
 
 ---
 
 ## 🚀 Demo
-
-> **Note for Reviewers:** GPU instance is stopped to minimize costs (~$12/day). 
-> Available for live demo during interview with 30-minute notice.
-
-### 📹 Video Walkthrough
-*[TODO: Add 2-3 minute Loom video showing:]*
-- API authentication in action
-- Sample query/response
-- Swagger UI demonstration
-- Architecture explanation
 
 ### 📸 Screenshots
 
@@ -92,75 +80,38 @@ curl -X POST http://localhost:8001/query \
 }
 ```
 
----
-
-## 🔐 Security Features
-
-| Feature | Implementation | Status |
-|---------|----------------|--------|
-| **API Authentication** | API key validation (X-API-Key header) | ✅ Implemented |
-| **Rate Limiting** | 5 requests/min per IP (slowapi) | ✅ Implemented |
-| **HTTP Error Codes** | 401, 429, 503, 500 with clear messages | ✅ Implemented |
-| **Elastic IP** | Static IP for EC2 (no IP changes on restart) | ✅ Implemented |
-| **Input Validation** | Pydantic models with type checking | ✅ Implemented |
-| **Error Logging** | Structured logging for debugging | ✅ Implemented |
-
-**Future Enhancements:**
-- 🔄 AWS Secrets Manager for credential storage
-- 🔄 Security groups (IP whitelisting for port 8000)
-- 🔄 CloudWatch monitoring and alerts
-- 🔄 Auto-scaling for production workloads
+> **Note:** The GPU instance is stopped most of the time to save costs (~$12/day). I can spin it up for a live demo with 30 minutes notice.
 
 ---
 
-## 🛠️ Technical Implementation
+## Key Features
 
-### Key Design Decisions
+- **API Security**: API key authentication and rate limiting (5 req/min per IP)
+- **Error Handling**: Proper HTTP status codes (401, 429, 503, 500) with clear messages
+- **RAG Implementation**: Vector search with Qdrant for document retrieval
+- **Self-hosted LLM**: vLLM running Llama 3.1 on AWS EC2 GPU
+- **Clean Code**: Type hints, error propagation, structured logging
 
-**1. Why vLLM over OpenAI API?**
-- ✅ Full control over model and data (no external dependencies)
-- ✅ Cost-effective for high volume (~$0.526/hour vs per-token pricing)
-- ✅ Low latency (no network calls to external API)
-- ✅ Demonstrates cloud deployment skills
+---
 
-**2. Why RAG over Fine-tuning?**
-- ✅ Always up-to-date (can refresh docs without retraining)
-- ✅ Transparent sourcing (shows which docs were used)
-- ✅ Lower compute cost (no training required)
-- ✅ Easier to maintain and update
+## Why These Choices?
 
-**3. Architecture Choices**
-- **FastAPI**: Modern, async, auto-generated docs, type safety
-- **Qdrant**: Fast vector search, easy Docker deployment
-- **Sentence Transformers**: Lightweight embeddings, runs locally
-- **Docker**: Consistent environments, easy deployment
+**vLLM over OpenAI API:**
+- Full control over the model and data
+- No per-token costs (just EC2 compute at ~$0.53/hour)
+- Lower latency—no external API calls
+- Good practice for real-world ML deployment
 
-### Code Quality Highlights
+**RAG over Fine-tuning:**
+- Can update documentation without retraining
+- Shows exactly which docs were used (transparency)
+- Much cheaper—no training compute needed
+- Easier to maintain
 
-```python
-# Clean error handling with proper HTTP codes
-@app.post("/query", dependencies=[Depends(verify_api_key)])
-@limiter.limit("5/minute")
-async def query_agent(request: Request, query_request: QueryRequest):
-    try:
-        response = agent.query(query_request.question)
-        return QueryResponse(question=query_request.question, answer=response)
-    except (APITimeoutError, APIConnectionError) as e:
-        raise HTTPException(503, f"LLM service unavailable: {type(e).__name__}")
-    except Exception as e:
-        # Smart error detection: service errors vs bugs
-        error_name = type(e).__name__
-        if "ResponseHandling" in error_name or "Qdrant" in error_name:
-            raise HTTPException(503, f"Search service unavailable: {error_name}")
-        else:
-            raise HTTPException(500, f"Internal server error: {error_name}")
-```
-
-**Notable Features:**
-- Type hints throughout (`def search(query: str) -> list[str]`)
-- Singleton pattern for expensive resources (LLM client, embeddings)
-- Error propagation from service layer to API layer
-- Structured logging for debugging
+**FastAPI + Qdrant + Docker:**
+- FastAPI gives you async support and auto-generated docs
+- Qdrant is fast and easy to run locally
+- Docker keeps everything reproducible
 
 ---
 
@@ -180,30 +131,41 @@ cd cloud-architecture-agent
 python -m venv .venv
 source .venv/bin/activate
 pip install -e .
+```
 
-# Fetch AWS documentation
+### 2. Get the AWS documentation
+
+```bash
 python scripts/fetch_docs.py
+```
 
-# Start Qdrant
+### 3. Start Qdrant and build the index
+
+```bash
 docker run -d --name qdrant -p 6333:6333 \
   -v $(pwd)/qdrant_storage:/qdrant/storage \
   qdrant/qdrant:latest
 
-# Build vector index
 python scripts/build_index.py
+```
 
-# Generate API keys
-openssl rand -hex 32  # Copy to .env
+### 4. Configure your environment
 
-# Create .env (see .env.example)
-# Add VLLM_API_URL and API_KEYS
+```bash
+# Generate an API key
+openssl rand -hex 32
 
-# Run API
+# Create .env file (see .env.example)
+# Set VLLM_API_URL and add your API_KEYS
+```
+
+### 5. Run the API
+
+```bash
 python -m uvicorn src.api.main:app --reload --port 8001
 ```
 
-### 2. Test the API
-
+Test it:
 ```bash
 # Health check (no auth required)
 curl http://localhost:8001/health
@@ -241,16 +203,13 @@ docker run -d --name vllm-server \
   --max-model-len 4096
 ```
 
-**Cost Management:**
-- Instance cost: ~$0.526/hour ($378/month if running 24/7)
-- **Strategy**: Stop EC2 when not in use (storage ~$5-10/month only)
-- Elastic IP: Free while running, $3.65/month when stopped
+**Cost note:** The g4dn.xlarge costs ~$0.53/hour ($12.72/day). I stop the instance when not using it (storage is only ~$5-10/month).
 
-See [docs/ec2-setup-walkthrough.md](docs/ec2-setup-walkthrough.md) for complete guide.
+For detailed EC2 setup with GPU, security groups, and Elastic IP configuration, see [docs/ec2-setup-walkthrough.md](docs/ec2-setup-walkthrough.md).
 
 ---
 
-## 📂 Project Structure
+## Project Structure
 
 ```
 cloud-architecture-agent/
@@ -273,7 +232,7 @@ cloud-architecture-agent/
 
 ---
 
-## 🧪 Testing
+## Testing
 
 ```bash
 # Run tests
@@ -293,90 +252,15 @@ pytest tests/test_agent.py -v
 
 ---
 
-## 📊 API Documentation
+## Documentation
 
-### Endpoints
-
-| Endpoint | Method | Auth | Rate Limit | Description |
-|----------|--------|------|------------|-------------|
-| `/` | GET | ❌ | None | Welcome message |
-| `/health` | GET | ❌ | None | Health check |
-| `/query` | POST | ✅ | 5/min | Ask AWS architecture question |
-| `/docs` | GET | ❌ | None | Swagger UI |
-
-### Error Codes
-
-| Code | Meaning | Cause |
-|------|---------|-------|
-| 200 | Success | Query processed successfully |
-| 401 | Unauthorized | Missing or invalid API key |
-| 422 | Validation Error | Invalid request body |
-| 429 | Rate Limit | Exceeded 5 requests/minute |
-| 503 | Service Unavailable | LLM or Qdrant offline |
-| 500 | Internal Error | Unexpected server error |
+- [docs/architecture.md](docs/architecture.md) - System design and architecture decisions
+- [docs/api.md](docs/api.md) - Complete API reference with all endpoints and error codes
+- [docs/deployment.md](docs/deployment.md) - Production deployment guide
+- [docs/ec2-setup-walkthrough.md](docs/ec2-setup-walkthrough.md) - Step-by-step EC2 GPU setup
 
 ---
 
-## 🎓 Learning Outcomes
+## License
 
-**Skills Demonstrated:**
-- Backend API development with Python/FastAPI
-- Vector search and RAG implementation
-- LLM deployment and inference optimization
-- AWS cloud infrastructure (EC2, Elastic IPs)
-- API security (authentication, rate limiting)
-- Error handling and logging
-- Docker containerization
-- Git workflow and documentation
-
----
-
-## 📝 Environment Variables
-
-```bash
-# .env file
-VLLM_API_URL=http://YOUR-ELASTIC-IP:8000/v1
-MODEL_NAME=meta-llama/Llama-3.1-8B-Instruct
-QDRANT_URL=http://localhost:6333
-EMBEDDING_MODEL=all-MiniLM-L6-v2
-PROJECT_NAME=Cloud Architecture Agent
-API_V1_STR=/api/v1
-API_KEYS=key1,key2,key3  # Generate with: openssl rand -hex 32
-```
-
-See [.env.example](.env.example) for complete template.
-
----
-
-## 🤝 For Recruiters
-
-**This project demonstrates:**
-- ✅ Full-stack backend development skills
-- ✅ Cloud architecture and deployment
-- ✅ Security best practices
-- ✅ Clean, maintainable code
-- ✅ Production-ready error handling
-- ✅ Documentation and communication
-
-**Live Demo:** Available during interview with 30-minute notice to start EC2 instance.
-
-**Contact:** [Your LinkedIn] | [Your Email]
-
----
-
-## 📜 License
-
-MIT License - See [LICENSE](LICENSE) for details.
-
----
-
-## 🔗 Additional Resources
-
-- [AWS Documentation](https://docs.aws.amazon.com/) (source of RAG data, CC-BY-SA-4.0)
-- [vLLM Documentation](https://docs.vllm.ai/)
-- [FastAPI Documentation](https://fastapi.tiangolo.com/)
-- [Qdrant Documentation](https://qdrant.tech/documentation/)
-
----
-
-**⭐ If you find this project interesting, please star it on GitHub!**
+MIT License - See [LICENSE](LICENSE)
