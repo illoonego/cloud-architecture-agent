@@ -13,12 +13,11 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.rag.indexing import Indexer
-
-
+from src.rag.indexing import Indexer  # noqa: E402
 
 # Load all Markdown files from data/aws_docs/
 RAW_DOCS_DIR = Path("data/aws_docs")
+
 
 def read_markdown_files(directory: Path) -> list[str]:
     docs = []
@@ -26,6 +25,7 @@ def read_markdown_files(directory: Path) -> list[str]:
         text = file.read_text(encoding="utf-8")
         docs.append(text)
     return docs
+
 
 # Simple chunking: split each doc into ~800-character chunks
 def chunk_text(text: str, chunk_size: int = 800) -> list[str]:
@@ -42,7 +42,6 @@ def chunk_text(text: str, chunk_size: int = 800) -> list[str]:
     if current:
         chunks.append(current.strip())
     return chunks
-
 
 
 def main():

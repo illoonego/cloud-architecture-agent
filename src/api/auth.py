@@ -16,23 +16,23 @@ from src.config.settings import settings
 api_key_header = APIKeyHeader(
     name="X-API-Key",
     auto_error=True,  # Automatically return 403 if header is missing
-    description="API key for authentication"
+    description="API key for authentication",
 )
 
 
 def verify_api_key(api_key: str = Security(api_key_header)) -> str:
     """
     Validate the API key from the request header.
-    
+
     Args:
         api_key: The API key from the X-API-Key header (auto-extracted by FastAPI)
-    
+
     Returns:
         str: The validated API key
-    
+
     Raises:
         HTTPException: 401 if the API key is invalid
-    
+
     Usage:
         @app.post("/protected-endpoint")
         def my_endpoint(api_key: str = Depends(verify_api_key)):
@@ -40,14 +40,14 @@ def verify_api_key(api_key: str = Security(api_key_header)) -> str:
             ...
     """
     valid_keys = settings.api_keys_list
-    
+
     # Check if any keys are configured
     if not valid_keys:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="API keys not configured. Set API_KEYS in .env file."
+            detail="API keys not configured. Set API_KEYS in .env file.",
         )
-    
+
     # Validate the provided key
     if api_key not in valid_keys:
         raise HTTPException(
@@ -55,5 +55,5 @@ def verify_api_key(api_key: str = Security(api_key_header)) -> str:
             detail="Invalid or expired API key",
             headers={"WWW-Authenticate": "ApiKey"},
         )
-    
+
     return api_key

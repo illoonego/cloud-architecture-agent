@@ -3,7 +3,7 @@
 import logging
 
 import openai
-from openai import APITimeoutError, APIConnectionError
+from openai import APIConnectionError, APITimeoutError
 
 from src.config.settings import settings
 
@@ -27,7 +27,7 @@ class LLMClient:
     def generate(self, prompt: str) -> str:
         """
         Send a prompt to the LLM and return the text answer.
-        
+
         Raises:
             APITimeoutError: If LLM server doesn't respond in time
             APIConnectionError: If cannot connect to LLM server

@@ -17,9 +17,7 @@ class EmbeddingService:
             print(f"[embeddings] Loading model: {settings.EMBEDDING_MODEL}...")
             self.encoder = SentenceTransformer(settings.EMBEDDING_MODEL)
         except Exception as e:
-            raise RuntimeError(
-                f"Failed to load embedding model '{settings.EMBEDDING_MODEL}': {e}"
-            )
+            raise RuntimeError(f"Failed to load embedding model '{settings.EMBEDDING_MODEL}': {e}") from e
 
     def encode(self, text: str) -> list[float]:
         """

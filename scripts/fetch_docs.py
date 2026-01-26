@@ -12,11 +12,9 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from typing import List, Dict
 
 import requests
 from bs4 import BeautifulSoup
-
 
 # --------- Config --------- #
 
@@ -25,7 +23,7 @@ SAVE_DIR.mkdir(parents=True, exist_ok=True)
 
 # List of (filename, url) pairs.
 # You can add/remove entries as you like.
-DOCS_TO_FETCH: List[Dict[str, str]] = [
+DOCS_TO_FETCH: list[dict[str, str]] = [
     # VPC & Networking
     {
         "filename": "vpc-what-is-amazon-vpc.md",
@@ -63,7 +61,6 @@ DOCS_TO_FETCH: List[Dict[str, str]] = [
         "filename": "transit-gateway.md",
         "url": "https://docs.aws.amazon.com/vpc/latest/tgw/what-is-transit-gateway.html",
     },
-
     # Load Balancing / Auto Scaling
     {
         "filename": "elb-introduction.md",
@@ -77,7 +74,6 @@ DOCS_TO_FETCH: List[Dict[str, str]] = [
         "filename": "ec2-auto-scaling.md",
         "url": "https://docs.aws.amazon.com/autoscaling/ec2/userguide/what-is-amazon-ec2-auto-scaling.html",
     },
-
     # Compute
     {
         "filename": "ec2-concepts.md",
@@ -91,7 +87,6 @@ DOCS_TO_FETCH: List[Dict[str, str]] = [
         "filename": "containers-on-aws.md",
         "url": "https://docs.aws.amazon.com/whitepapers/latest/container-services-on-aws/",
     },
-
     # Serverless
     {
         "filename": "lambda-welcome.md",
@@ -101,7 +96,6 @@ DOCS_TO_FETCH: List[Dict[str, str]] = [
         "filename": "apigateway-welcome.md",
         "url": "https://docs.aws.amazon.com/apigateway/latest/developerguide/welcome.html",
     },
-
     # Storage & Databases
     {
         "filename": "s3-welcome.md",
@@ -115,7 +109,6 @@ DOCS_TO_FETCH: List[Dict[str, str]] = [
         "filename": "dynamodb-introduction.md",
         "url": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Introduction.html",
     },
-
     # Security / IAM
     {
         "filename": "iam-introduction.md",
@@ -125,7 +118,6 @@ DOCS_TO_FETCH: List[Dict[str, str]] = [
         "filename": "iam-best-practices.md",
         "url": "https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html",
     },
-
     # Well-Architected
     {
         "filename": "well-architected-framework-welcome.md",
@@ -144,9 +136,7 @@ DOCS_TO_FETCH: List[Dict[str, str]] = [
 
 # --------- Helpers --------- #
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (compatible; AWS-Cloud-Architecture-Agent/1.0)"
-}
+HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; AWS-Cloud-Architecture-Agent/1.0)"}
 
 
 def fetch_html(url: str) -> str:
@@ -204,6 +194,7 @@ def save_markdown(filename: str, content: str) -> None:
 
 
 # --------- Main --------- #
+
 
 def main() -> None:
     print(f"[fetch_docs] Output directory: {SAVE_DIR.resolve()}")
