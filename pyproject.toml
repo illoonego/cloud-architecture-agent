@@ -21,6 +21,7 @@ dependencies = [
   "uvicorn",
   "pydantic",
   "pydantic-settings",
+  "boto3",
   "python-dotenv",
   "openai",
   "qdrant-client",
