@@ -1,5 +1,3 @@
-# src/config/settings.py
-
 from pydantic_settings import BaseSettings
 
 
@@ -13,7 +11,7 @@ class Settings(BaseSettings):
     # Override with .env file: VLLM_API_URL=http://YOUR_ELASTIC_IP:8000/v1
     # Use Elastic IP for stable address that won't change on EC2 stop/start
     VLLM_API_URL: str = "http://localhost:8000/v1"
-    MODEL_NAME: str = "meta-llama/Llama-3.1-8B-Instruct"
+    MODEL_NAME: str = "Qwen/Qwen2.5-3B-Instruct"
 
     # --- RAG / Qdrant ---
     # Local dev: ":memory:" for in-process Qdrant
