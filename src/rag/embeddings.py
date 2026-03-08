@@ -1,6 +1,7 @@
 # src/rag/embeddings.py
 
 from functools import lru_cache
+from typing import cast
 
 from sentence_transformers import SentenceTransformer
 
@@ -25,13 +26,13 @@ class EmbeddingService:
         """
         Convert a single string into a vector.
         """
-        return self.encoder.encode(text).tolist()
+        return cast(list[float], self.encoder.encode(text).tolist())
 
     def encode_batch(self, texts: list[str]) -> list[list[float]]:
         """
         Convert a list of strings into a list of vectors.
         """
-        return self.encoder.encode(texts).tolist()
+        return cast(list[list[float]], self.encoder.encode(texts).tolist())
 
 
 @lru_cache

@@ -84,5 +84,36 @@ class Settings(BaseSettings):
 
         return []
 
+    @property
+    def auth_config_status(self) -> dict[str, object]:
+        """Return safe auth diagnostics without exposing API key values."""
+        if not self.AWS_SECRET_NAME:
+            return {
+                "configured": False,
+                "source": "none",
+                "key_count": 0,
+                "error": "Set AWS_SECRET_NAME/AWS_REGION",
+            }
+
+        try:
+            secret_raw = get_secret(self.AWS_SECRET_NAME, self.AWS_REGION)
+            keys = self._extract_keys_from_secret(secret_raw)
+            return {
+                "configured": bool(keys),
+                "source": "secrets_manager",
+                "key_count": len(keys),
+                "secret_name": self.AWS_SECRET_NAME,
+                "region": self.AWS_REGION,
+            }
+        except Exception as exc:
+            return {
+                "configured": False,
+                "source": "secrets_manager_error",
+                "key_count": 0,
+                "secret_name": self.AWS_SECRET_NAME,
+                "region": self.AWS_REGION,
+                "error": f"{type(exc).__name__}: {exc}",
+            }
+
 
 settings = Settings()
