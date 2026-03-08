@@ -254,8 +254,9 @@ RAG_TOP_K=3
 PROJECT_NAME=Cloud Architecture Agent
 API_V1_STR=/api/v1
 
-# Authentication (comma-separated API keys)
-API_KEYS=key1,key2,key3
+# Authentication (AWS Secrets Manager)
+AWS_SECRET_NAME=cloud-architecture-agent/prod
+AWS_REGION=us-east-1
 ```
 
 ---
@@ -271,7 +272,6 @@ API_KEYS=key1,key2,key3
 
 ### 🔄 Future Enhancements
 
-- AWS Secrets Manager for key storage
 - IP whitelisting via security groups
 - OAuth 2.0 / JWT tokens
 - Per-key rate limiting (different limits per user)
