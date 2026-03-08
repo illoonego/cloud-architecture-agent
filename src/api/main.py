@@ -56,6 +56,12 @@ def health_check() -> dict:
     return {"status": "healthy", "project": settings.PROJECT_NAME}
 
 
+@app.get("/health/auth")
+def auth_health_check() -> dict[str, object]:
+    """Show auth configuration source and key count without exposing secrets."""
+    return settings.auth_config_status
+
+
 @app.post("/query", response_model=QueryResponse, dependencies=[Depends(verify_api_key)])
 @limiter.limit("5/minute")
 def query_agent(request: Request, query_request: QueryRequest) -> QueryResponse:

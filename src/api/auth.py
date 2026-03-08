@@ -39,13 +39,22 @@ def verify_api_key(api_key: str = Security(api_key_header)) -> str:
             # This only runs if API key is valid
             ...
     """
-    valid_keys = settings.api_keys_list
+    try:
+        valid_keys = settings.api_keys_list
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(exc),
+        ) from exc
 
     # Check if any keys are configured
     if not valid_keys:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="API keys not configured. Set API_KEYS in .env file.",
+            detail=(
+                "API keys not configured. Configure AWS Secrets Manager "
+                "(AWS_SECRET_NAME/AWS_REGION)."
+            ),
         )
 
     # Validate the provided key

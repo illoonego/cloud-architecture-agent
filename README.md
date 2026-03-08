@@ -152,11 +152,8 @@ python scripts/build_index.py
 ### 4. Configure your environment
 
 ```bash
-# Generate an API key
-openssl rand -hex 32
-
 # Create .env file (see .env.example)
-# Set VLLM_API_URL and add your API_KEYS
+# Set VLLM_API_URL, AWS_SECRET_NAME, and AWS_REGION
 ```
 
 ### 5. Run the API

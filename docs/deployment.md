@@ -101,8 +101,9 @@ QDRANT_URL=:memory:  # In-memory mode
 EMBEDDING_MODEL=all-MiniLM-L6-v2
 QUERY_TOP_K=5
 
-# Security
-API_KEYS=key1,key2,key3  # Generate with: openssl rand -hex 32
+# Security (AWS Secrets Manager)
+AWS_SECRET_NAME=cloud-architecture-agent/prod
+AWS_REGION=us-east-1
 
 # Server
 HOST=0.0.0.0
@@ -184,7 +185,7 @@ aws ec2 describe-instances --instance-ids i-YOUR-INSTANCE-ID \
 
 ### API Key Management
 
-**Generate API Keys:**
+**Generate API Keys (for SecretString value):**
 ```bash
 # Generate 3 secure keys
 openssl rand -hex 32
@@ -192,16 +193,16 @@ openssl rand -hex 32
 openssl rand -hex 32
 ```
 
-**Store in `.env`:**
+**Store in AWS Secrets Manager SecretString:**
 ```bash
-API_KEYS=key1,key2,key3
+{"API_KEYS":"key1,key2,key3"}
 ```
 
 **⚠️ Security Notes:**
 - Never commit `.env` to Git (already in `.gitignore`)
 - Share keys securely (1Password, encrypted channels)
 - Rotate keys periodically
-- For production: Use AWS Secrets Manager
+- For production and local runtime parity: Use AWS Secrets Manager
 
 ### Rate Limiting
 

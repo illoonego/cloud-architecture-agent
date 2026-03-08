@@ -49,7 +49,8 @@ class LLMClient:
                 temperature=0.7,
                 max_tokens=512,
             )
-            return response.choices[0].message.content
+            content = response.choices[0].message.content
+            return content or ""
         except (APITimeoutError, APIConnectionError) as e:
             logger.error(f"LLM service unavailable: {type(e).__name__}: {e}")
             # Re-raise to let FastAPI handle with proper status code
