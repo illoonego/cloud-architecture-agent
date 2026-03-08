@@ -5,7 +5,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from src.config.secrets_manager import get_secret
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
